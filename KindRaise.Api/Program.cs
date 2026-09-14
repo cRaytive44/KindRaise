@@ -1,12 +1,16 @@
 using FastEndpoints;
+using KindRaise.Infrastructure.Database;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddFastEndpoints();
 
 // Add services to the container.
+builder.Services.AddDbContext<KindRaiseDbContext>(options =>
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("KindRaiseDb")));
 
-builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
@@ -19,11 +23,5 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseFastEndpoints();
-
-app.UseHttpsRedirection();
-
-app.UseAuthorization();
-
-app.MapControllers();
 
 app.Run();

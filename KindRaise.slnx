@@ -1,11 +1,14 @@
 <Solution>
-  <Project Path="../DonationWorker/KindRaise.DonationWorker.csproj" />
-  <Project Path="../KindRaise.Api/KindRaise.Api.csproj" />
-  <Project Path="../KindRaise.Application/KindRaise.Application.csproj" />
-  <Project Path="../KindRaise.Contracts/KindRaise.Contracts.csproj" />
-  <Project Path="../KindRaise.Domain/KindRaise.Domain.csproj" />
-  <Project Path="../KindRaise.Infrastructure/KindRaise.Infrastructure.csproj" />
-  <Project Path="../KindRaise.IntegrationTests/KindRaise.IntegrationTests.csproj" />
-  <Project Path="../KindRaise.UnitTests/KindRaise.UnitTests.csproj" />
-  <Project Path="../NotificationWorker/KindRaise.NotificationWorker.csproj" />
+  <Folder Name="/Solution Items/">
+    <File Path="docker-compose.yml" />
+  </Folder>
+  <Project Path="KindRaise.Api/KindRaise.Api.csproj" />
+  <Project Path="KindRaise.Application/KindRaise.Application.csproj" />
+  <Project Path="KindRaise.Contracts/KindRaise.Contracts.csproj" />
+  <Project Path="KindRaise.Domain/KindRaise.Domain.csproj" />
+  <Project Path="KindRaise.DonationWorker/KindRaise.DonationWorker.csproj" />
+  <Project Path="KindRaise.Infrastructure/KindRaise.Infrastructure.csproj" />
+  <Project Path="KindRaise.IntegrationTests/KindRaise.IntegrationTests.csproj" />
+  <Project Path="KindRaise.NotificationWorker/KindRaise.NotificationWorker.csproj" />
+  <Project Path="KindRaise.UnitTests/KindRaise.UnitTests.csproj" />
 </Solution>
