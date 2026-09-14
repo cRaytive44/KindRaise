@@ -1,6 +1,13 @@
 @KindRaise.Api_HostAddress = http://localhost:5138
 
-GET {{KindRaise.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+POST {{KindRaise.Api_HostAddress}}/api/campaigns
+Content-Type: application/json
+
+{
+  "name": "Help Build a School",
+  "description": "A campaign to raise money for a new school.",
+  "monetaryGoal": 10000
+}
+
 
 ###

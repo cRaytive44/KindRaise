@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: kindraise-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: KindRaiseDb
+    ports:
+      - "5432:5432"
+    volumes:
+      - kindraise-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  kindraise-postgres-data:
