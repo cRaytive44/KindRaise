@@ -7,7 +7,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="FluentValidation" Version="12.1.1" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\KindRaise.Domain\KindRaise.Domain.csproj" />
+    <ProjectReference Include="..\KindRaise.Infrastructure\KindRaise.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

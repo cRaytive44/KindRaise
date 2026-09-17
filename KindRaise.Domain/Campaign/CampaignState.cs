@@ -2,7 +2,7 @@
 {
     public enum CampaignState
     {
-        ACTIVE,
-        INACTIVE,
+        Active,
+        Inactive,
     }
 }
