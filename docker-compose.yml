@@ -12,5 +12,19 @@ services:
     volumes:
       - kindraise-postgres-data:/var/lib/postgresql/data
 
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: kindraise-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - kindraise-rabbitmq-data:/var/lib/rabbitmq
+
 volumes:
   kindraise-postgres-data:
+  kindraise-rabbitmq-data:

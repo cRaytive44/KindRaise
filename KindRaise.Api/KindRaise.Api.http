@@ -4,9 +4,11 @@ POST {{KindRaise.Api_HostAddress}}/api/campaigns
 Content-Type: application/json
 
 {
-  "name": "Help Build a School",
+  "title": "Help Build a School",
   "description": "A campaign to raise money for a new school.",
-  "monetaryGoal": 10000
+  "monetaryGoal": 10000,
+  "startDate": "2026-09-18T00:00:00Z",
+  "endDate": "2026-09-19T23:59:59Z"
 }
 
 

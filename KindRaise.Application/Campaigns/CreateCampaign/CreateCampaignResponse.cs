@@ -1,8 +1,8 @@
 ﻿using KindRaise.Domain.Campaign;
 
-namespace KindRaise.Api.ResponseDTOs
+namespace KindRaise.Application.Campaigns.CreateCampaign
 {
-    public class CreateCampaignResponse
+    public sealed class CreateCampaignResponse
     {
         public Guid Id { get; init; }
         public string Title { get; init; } = string.Empty;
@@ -11,6 +11,6 @@ namespace KindRaise.Api.ResponseDTOs
         public DateTimeOffset StartDate { get; init; }
         public DateTimeOffset EndDate { get; init; }
         public decimal DonatedAmount { get; init; }
-        public CampaignState CampaignState { get; init; } 
+        public CampaignState CampaignState { get; init; }
     }
 }

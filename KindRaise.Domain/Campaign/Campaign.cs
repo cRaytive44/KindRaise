@@ -1,6 +1,4 @@
-﻿using KindRaise.Domain.Campaign;
-
-namespace KindRaise.Domain.Campain
+﻿namespace KindRaise.Domain.Campaign
 {
     public class Campaign
     {
@@ -8,13 +6,20 @@ namespace KindRaise.Domain.Campain
         public string Title { get; }
         public string Description { get; }
         public decimal MonetaryGoal { get; }
-        public DateTime StartDate { get; }
-        public DateTime EndDate { get; }
+        public DateTimeOffset StartDate { get; }
+        public DateTimeOffset EndDate { get; }
+        public decimal DonatedAmount { get; private set; } = 0;
+        public CampaignState CampaignState { get; private set; } = CampaignState.Inactive;
 
-        public CampaignInformation Information { get; set; } = new CampaignInformation();
-
-        public Campaign(string title, string description, decimal monetaryGoal, DateTime startDate, DateTime endDate)
+        public Campaign(string title, string description, decimal monetaryGoal, DateTimeOffset startDate, DateTimeOffset endDate)
         {
+            ArgumentException.ThrowIfNullOrWhiteSpace(title);
+            ArgumentException.ThrowIfNullOrWhiteSpace(description);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(monetaryGoal);
+
+            if (endDate <= startDate)
+                throw new ArgumentException("End date must be after start date.");
+
             Title = title;
             Description = description;
             MonetaryGoal = monetaryGoal;
@@ -22,11 +27,31 @@ namespace KindRaise.Domain.Campain
             EndDate = endDate;
         }
 
-    }
+        // Used by EF Core when materializing persisted entities.
+        private Campaign() 
+        {
+            Title = string.Empty;
+            Description = string.Empty;
+            MonetaryGoal = 1;
+            StartDate = DateTimeOffset.MinValue;
+            EndDate = DateTimeOffset.MinValue;
+        } 
 
-    public class CampaignInformation 
-    {
-        public decimal DonatedAmount { get; set; }
-        public CampaignState CampaignState { get; set; }
+        public void UpdateCampaignState()
+        {
+            var now = DateTimeOffset.UtcNow;
+
+            CampaignState = now >= StartDate && now <= EndDate
+                ? CampaignState.Active
+                : CampaignState.Inactive;
+        }
+
+        public void AddDonation(decimal amount)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amount);
+
+            DonatedAmount += amount;
+        }
+
     }
 }
