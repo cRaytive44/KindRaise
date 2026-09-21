@@ -3,6 +3,7 @@ using System;
 using KindRaise.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace KindRaise.Infrastructure.Migrations
 {
     [DbContext(typeof(KindRaiseDbContext))]
-    partial class KindRaiseDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260918105924_Removed_CampaignState")]
+    partial class Removed_CampaignState
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

@@ -1,4 +1,6 @@
-﻿namespace KindRaise.Domain.Campaign
+﻿using KindRaise.Domain.Exceptions;
+
+namespace KindRaise.Domain.Campaign
 {
     public class Campaign
     {
@@ -9,7 +11,18 @@
         public DateTimeOffset StartDate { get; }
         public DateTimeOffset EndDate { get; }
         public decimal DonatedAmount { get; private set; } = 0;
-        public CampaignState CampaignState { get; private set; } = CampaignState.Inactive;
+        public CampaignState CampaignState
+        {
+            get
+            {
+                var now = DateTimeOffset.UtcNow;
+
+                return now >= StartDate &&
+                       now <= EndDate
+                    ? CampaignState.Active
+                    : CampaignState.Inactive;
+            }
+        }
 
         public Campaign(string title, string description, decimal monetaryGoal, DateTimeOffset startDate, DateTimeOffset endDate)
         {
@@ -35,15 +48,6 @@
             MonetaryGoal = 1;
             StartDate = DateTimeOffset.MinValue;
             EndDate = DateTimeOffset.MinValue;
-        } 
-
-        public void UpdateCampaignState()
-        {
-            var now = DateTimeOffset.UtcNow;
-
-            CampaignState = now >= StartDate && now <= EndDate
-                ? CampaignState.Active
-                : CampaignState.Inactive;
         }
 
         public void AddDonation(decimal amount)
@@ -53,5 +57,14 @@
             DonatedAmount += amount;
         }
 
+        public void EnsureCanBeDeleted()
+        {
+            if (DonatedAmount > 0 &&
+                CampaignState == CampaignState.Active)
+            {
+                throw new CampaignDeletionNotAllowedException(
+                    "An active campaign with donations cannot be deleted.");
+            }
+        }
     }
 }

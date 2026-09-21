@@ -1,7 +1,10 @@
 using FastEndpoints;
 using FluentValidation;
 using KindRaise.Application.Campaigns.CreateCampaign;
-using KindRaise.Application.Services;
+using KindRaise.Application.Services.CreateCampaign;
+using KindRaise.Application.Services.DeleteCampaign;
+using KindRaise.Application.Services.GetCampaign;
+using KindRaise.Application.Services.GetCampaigns;
 using KindRaise.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,6 +22,9 @@ builder.Services.AddDbContext<KindRaiseDbContext>(options =>
 
 // Services
 builder.Services.AddScoped<ICreateCampaignService, CreateCampaignService>();
+builder.Services.AddScoped<IGetCampaignService, GetCampaignService>();
+builder.Services.AddScoped<IDeleteCampaignService, DeleteCampaignService>();
+builder.Services.AddScoped<IGetCampaignsService, GetCampaignsService>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();

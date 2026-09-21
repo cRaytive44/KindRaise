@@ -1,6 +1,6 @@
 ﻿using KindRaise.Application.Campaigns.CreateCampaign;
 
-namespace KindRaise.Application.Services
+namespace KindRaise.Application.Services.CreateCampaign
 {
     public interface ICreateCampaignService
     {

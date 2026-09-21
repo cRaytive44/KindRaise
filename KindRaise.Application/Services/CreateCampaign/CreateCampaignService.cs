@@ -3,7 +3,7 @@ using KindRaise.Application.Campaigns.CreateCampaign;
 using KindRaise.Domain.Campaign;
 using KindRaise.Infrastructure.Database;
 
-namespace KindRaise.Application.Services
+namespace KindRaise.Application.Services.CreateCampaign
 {
     public sealed class CreateCampaignService
         : ICreateCampaignService
