@@ -1,6 +1,6 @@
 ﻿using KindRaise.Domain.Campaign;
 
-namespace KindRaise.Api.ResponseDTOs
+namespace KindRaise.Application.Campaigns.GetCampaign
 {
     public sealed class GetCampaignResponse
     {

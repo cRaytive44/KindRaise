@@ -13,3 +13,13 @@ Content-Type: application/json
 
 
 ###
+
+GET {{KindRaise.Api_HostAddress}}/api/campaigns/8628e871-f9d6-4176-91f1-dbecc2dd825c
+Content-Type: application/json
+
+###
+
+GET {{KindRaise.Api_HostAddress}}/api/campaigns
+Content-Type: application/json
+
+###

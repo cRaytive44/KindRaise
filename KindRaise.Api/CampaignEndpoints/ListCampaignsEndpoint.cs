@@ -1,36 +1,27 @@
 ﻿using FastEndpoints;
-using KindRaise.Api.ResponseDTOs;
+using KindRaise.Application.Campaigns.GetCampaigns;
+using KindRaise.Application.Services.GetCampaigns;
 
 namespace KindRaise.Api.CampaignEndpoints
 {
-    public class ListCampaignsEndpoint : EndpointWithoutRequest<List<GetCampaignResponse>>
+    public class ListCampaignsEndpoint : Endpoint<GetCampaignsRequest, GetCampaignsPagedResponse>
     {
+        private readonly IGetCampaignsService _service;
+
+        public ListCampaignsEndpoint(IGetCampaignsService service)
+        {
+            _service = service;
+        }
+
         public override void Configure()
         {
             Get("/api/campaigns");
             AllowAnonymous();
         }
 
-        // I need to add access to the database to retrieve the campaigns.
-        public override async Task HandleAsync(CancellationToken cancellationToken)
+        public override async Task HandleAsync(GetCampaignsRequest request, CancellationToken cancellationToken)
         {
-            var campaigns = new List<GetCampaignResponse>
-            {
-                new()
-                {
-                    Id = Guid.NewGuid(),
-                    Name = "Campaign 1",
-                    Description = "Description 1",
-                    MonetaryGoal = 1000
-                },
-                new()
-                {
-                    Id = Guid.NewGuid(),
-                    Name = "Campaign 2",
-                    Description = "Description 2",
-                    MonetaryGoal = 2000
-                }
-            };
+            var campaigns = await _service.GetAllAsync(request, cancellationToken);
 
             await Send.OkAsync(campaigns, cancellationToken);
         }

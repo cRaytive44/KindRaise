@@ -1,8 +1,8 @@
 ﻿using KindRaise.Domain.Campaign;
 
-namespace KindRaise.Api.ResponseDTOs
+namespace KindRaise.Application.Campaigns.GetCampaigns
 {
-    public sealed class GetCampaignResponse
+    public class GetCampaignsResponse
     {
         public Guid Id { get; init; }
         public string Title { get; init; } = string.Empty;
