@@ -1,4 +1,5 @@
 ﻿using KindRaise.Domain.Campaign;
+using KindRaise.Domain.Donation;
 using Microsoft.EntityFrameworkCore;
 
 namespace KindRaise.Infrastructure.Database
@@ -11,6 +12,7 @@ namespace KindRaise.Infrastructure.Database
         }
 
         public DbSet<Campaign> Campaigns => Set<Campaign>();
+        public DbSet<Donation> Donations => Set<Donation>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

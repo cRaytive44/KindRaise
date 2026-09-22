@@ -15,4 +15,9 @@
     <ProjectReference Include="..\KindRaise.Infrastructure\KindRaise.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Donations\GetDonation\" />
+    <Folder Include="Donations\GetDonations\" />
+  </ItemGroup>
+
 </Project>

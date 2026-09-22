@@ -2,8 +2,8 @@
 {
     public enum ProcessingState
     {
-        PENDING,
-        PROCESSED,
-        FAILED
+        Pending,
+        Processed,
+        Failed
     }
 }

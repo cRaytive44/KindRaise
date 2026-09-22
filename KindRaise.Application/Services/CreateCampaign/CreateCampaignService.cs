@@ -5,8 +5,7 @@ using KindRaise.Infrastructure.Database;
 
 namespace KindRaise.Application.Services.CreateCampaign
 {
-    public sealed class CreateCampaignService
-        : ICreateCampaignService
+    public sealed class CreateCampaignService : ICreateCampaignService
     {
         private readonly KindRaiseDbContext _dbContext;
         private readonly IValidator<CreateCampaignRequest> _validator;
@@ -23,9 +22,7 @@ namespace KindRaise.Application.Services.CreateCampaign
             CreateCampaignRequest request,
             CancellationToken cancellationToken)
         {
-            await _validator.ValidateAndThrowAsync(
-                request,
-                cancellationToken);
+            await _validator.ValidateAndThrowAsync(request, cancellationToken);
 
             var campaign = new Campaign
             (

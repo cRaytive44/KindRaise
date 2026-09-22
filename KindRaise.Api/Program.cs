@@ -2,6 +2,7 @@ using FastEndpoints;
 using FluentValidation;
 using KindRaise.Application.Campaigns.CreateCampaign;
 using KindRaise.Application.Services.CreateCampaign;
+using KindRaise.Application.Services.CreateDonation;
 using KindRaise.Application.Services.DeleteCampaign;
 using KindRaise.Application.Services.GetCampaign;
 using KindRaise.Application.Services.GetCampaigns;
@@ -25,6 +26,8 @@ builder.Services.AddScoped<ICreateCampaignService, CreateCampaignService>();
 builder.Services.AddScoped<IGetCampaignService, GetCampaignService>();
 builder.Services.AddScoped<IDeleteCampaignService, DeleteCampaignService>();
 builder.Services.AddScoped<IGetCampaignsService, GetCampaignsService>();
+
+builder.Services.AddScoped<ICreateDonationService, CreateDonationService>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
