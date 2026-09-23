@@ -1,6 +1,6 @@
 ﻿namespace KindRaise.Application.Campaigns.GetCampaigns
 {
-    public class GetCampaignsPagedResponse
+    public sealed class GetCampaignsPagedResponse
     {
         public List<GetCampaignsResponse> Items { get; init; } = [];
         public int Page { get; init; }

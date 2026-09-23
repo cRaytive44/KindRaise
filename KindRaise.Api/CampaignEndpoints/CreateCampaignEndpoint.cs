@@ -2,8 +2,6 @@
 using KindRaise.Api.RequestDTOs;
 using KindRaise.Api.ResponseDTOs;
 using KindRaise.Application.Services.CreateCampaign;
-using KindRaise.Infrastructure.Database;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace KindRaise.Api.CampaignEndpoints
 {

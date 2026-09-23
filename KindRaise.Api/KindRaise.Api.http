@@ -23,3 +23,23 @@ GET {{KindRaise.Api_HostAddress}}/api/campaigns
 Content-Type: application/json
 
 ###
+
+POST {{KindRaise.Api_HostAddress}}/api/campaigns/8628e871-f9d6-4176-91f1-dbecc2dd825c/donations
+Content-Type: application/json
+
+{
+  "donorName": "Henrique",
+  "amount": 20
+}
+
+###
+
+GET {{KindRaise.Api_HostAddress}}/api/donations/445ac7a4-2b24-430a-93ef-256a46711fad
+Content-Type: application/json
+
+###
+
+GET {{KindRaise.Api_HostAddress}}/api/donations
+Content-Type: application/json
+
+###

@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace KindRaise.Application.Services.GetCampaigns
 {
-    public class GetCampaignsService : IGetCampaignsService
+    public sealed class GetCampaignsService : IGetCampaignsService
     {
         private readonly KindRaiseDbContext _dbContext;
 
@@ -66,7 +66,7 @@ namespace KindRaise.Application.Services.GetCampaigns
 
         }
 
-        private IQueryable<Campaign> StartDateFilter(
+        private static IQueryable<Campaign> StartDateFilter(
             IQueryable<Campaign> query,
             GetCampaignsRequest request)
         {
@@ -86,7 +86,7 @@ namespace KindRaise.Application.Services.GetCampaigns
             return query;
         }
 
-        private IQueryable<Campaign> EndDateFilter(
+        private static IQueryable<Campaign> EndDateFilter(
             IQueryable<Campaign> query,
             GetCampaignsRequest request)
         {
@@ -105,7 +105,7 @@ namespace KindRaise.Application.Services.GetCampaigns
             return query;
         }
 
-        private IQueryable<Campaign> MonetaryGoalFilter(
+        private static IQueryable<Campaign> MonetaryGoalFilter(
             IQueryable<Campaign> query,
             GetCampaignsRequest request)
         {
@@ -122,7 +122,7 @@ namespace KindRaise.Application.Services.GetCampaigns
             return query;
         }
 
-        private IQueryable<Campaign> DonatedAmountFilter(
+        private static IQueryable<Campaign> DonatedAmountFilter(
             IQueryable<Campaign> query,
             GetCampaignsRequest request)
         {
@@ -139,7 +139,7 @@ namespace KindRaise.Application.Services.GetCampaigns
             return query;
         }
 
-        private IQueryable<Campaign> CampaignStateFilter(
+        private static IQueryable<Campaign> CampaignStateFilter(
             IQueryable<Campaign> query,
             GetCampaignsRequest request)
         {
