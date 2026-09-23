@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace KindRaise.Application.Services.DeleteCampaign
 {
-    public class DeleteCampaignService : IDeleteCampaignService
+    public sealed class DeleteCampaignService : IDeleteCampaignService
     {
         private readonly KindRaiseDbContext _dbContext;
 

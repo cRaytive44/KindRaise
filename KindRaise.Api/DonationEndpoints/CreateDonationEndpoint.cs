@@ -24,7 +24,7 @@ namespace KindRaise.Api.DonationEndpoints
         {
             var campaignId = Route<Guid>("campaignId");
 
-            var applicationRequest = new Application.Donations.CreateDonationRequest
+            var applicationRequest = new Application.Donations.CreateDonation.CreateDonationRequest
             {
                 CampaignId = campaignId,
                 DonorName = request.DonorName,

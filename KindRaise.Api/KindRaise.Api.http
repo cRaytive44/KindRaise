@@ -33,3 +33,13 @@ Content-Type: application/json
 }
 
 ###
+
+GET {{KindRaise.Api_HostAddress}}/api/donations/445ac7a4-2b24-430a-93ef-256a46711fad
+Content-Type: application/json
+
+###
+
+GET {{KindRaise.Api_HostAddress}}/api/donations
+Content-Type: application/json
+
+###

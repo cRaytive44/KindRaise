@@ -1,5 +1,4 @@
 ﻿using FastEndpoints;
-using KindRaise.Api.ResponseDTOs;
 using KindRaise.Application.Campaigns.GetCampaign;
 using KindRaise.Application.Services.GetCampaign;
 

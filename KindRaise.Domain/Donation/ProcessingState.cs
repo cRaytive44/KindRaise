@@ -4,6 +4,7 @@
     {
         Pending,
         Processed,
-        Failed
+        TemporaryFailure,
+        Rejected
     }
 }

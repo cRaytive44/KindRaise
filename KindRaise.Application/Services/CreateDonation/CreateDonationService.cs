@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace KindRaise.Application.Services.CreateDonation
 {
-    public class CreateDonationService : ICreateDonationService
+    public sealed class CreateDonationService : ICreateDonationService
     {
         private readonly KindRaiseDbContext _dbContext;
         private readonly IValidator<CreateDonationRequest> _validator;

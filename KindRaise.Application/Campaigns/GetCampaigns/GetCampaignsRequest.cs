@@ -2,7 +2,7 @@
 
 namespace KindRaise.Application.Campaigns.GetCampaigns
 {
-    public class GetCampaignsRequest
+    public sealed class GetCampaignsRequest
     {
         public int Page { get; set; } = 1;
         public int PageSize { get; set; } = 10;
