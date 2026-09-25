@@ -1,6 +1,6 @@
 ﻿using FastEndpoints;
 using KindRaise.Application.Donations.GetDonation;
-using KindRaise.Application.Services.GetDonation;
+using KindRaise.Application.Services.Donations.GetDonation;
 
 namespace KindRaise.Api.DonationEndpoints
 {

@@ -1,6 +1,6 @@
 ﻿using FastEndpoints;
 using KindRaise.Application.Campaigns.DeleteCampaign;
-using KindRaise.Application.Services.DeleteCampaign;
+using KindRaise.Application.Services.Campaigns.DeleteCampaign;
 using KindRaise.Domain.Exceptions;
 
 namespace KindRaise.Api.CampaignEndpoints

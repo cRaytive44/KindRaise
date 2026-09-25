@@ -1,7 +1,7 @@
 ﻿using FastEndpoints;
 using KindRaise.Api.RequestDTOs;
 using KindRaise.Api.ResponseDTOs;
-using KindRaise.Application.Services.CreateCampaign;
+using KindRaise.Application.Services.Campaigns.CreateCampaign;
 
 namespace KindRaise.Api.CampaignEndpoints
 {
