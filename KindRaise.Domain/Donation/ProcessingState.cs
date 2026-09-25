@@ -3,6 +3,7 @@
     public enum ProcessingState
     {
         Pending,
+        Processing,
         Processed,
         TemporaryFailure,
         Rejected

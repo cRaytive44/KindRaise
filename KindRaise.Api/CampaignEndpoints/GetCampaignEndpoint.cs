@@ -1,6 +1,6 @@
 ﻿using FastEndpoints;
 using KindRaise.Application.Campaigns.GetCampaign;
-using KindRaise.Application.Services.GetCampaign;
+using KindRaise.Application.Services.Campaigns.GetCampaign;
 
 namespace KindRaise.Api.CampaignEndpoints
 {

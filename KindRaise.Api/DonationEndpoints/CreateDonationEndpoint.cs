@@ -1,7 +1,7 @@
 ﻿using FastEndpoints;
 using KindRaise.Api.RequestDTOs;
 using KindRaise.Api.ResponseDTOs;
-using KindRaise.Application.Services.CreateDonation;
+using KindRaise.Application.Services.Donations.CreateDonation;
 
 namespace KindRaise.Api.DonationEndpoints
 {
