@@ -7,7 +7,6 @@ namespace KindRaise.Infrastructure.Messaging.RabbitMQ
         // Exchange and queue names
         public const string DonationsExchange = "kindraise.donations";
         public const string DonationRequestsQueue = "kindraise.donation.requests";
-        public const string DonationRequestedRoutingKey = "donation.requested";
 
         // Retry exchange and queue names
         public const string RetryExchange = "kindraise.retry";
@@ -17,6 +16,9 @@ namespace KindRaise.Infrastructure.Messaging.RabbitMQ
         public const string DeadLetterExchange ="kindraise.donations.dlx";
         public const string DeadLetterQueue = "kindraise.donation-requests.dlq";
         public const string DeadLetterRoutingKey = "donation.dead";
+
+        // Events exchange name
+        public const string EventsExchange = "kindraise.events";
 
         // Retry delay in milliseconds
         public const int RetryDelayMilliseconds = 5000;
@@ -49,6 +51,13 @@ namespace KindRaise.Infrastructure.Messaging.RabbitMQ
                 autoDelete: false,
                 cancellationToken: cancellationToken);
 
+            await channel.ExchangeDeclareAsync(
+                exchange: EventsExchange,
+                type: ExchangeType.Topic,
+                durable: true,
+                autoDelete: false,
+                cancellationToken: cancellationToken);
+
             // Main queue
             var mainQueueArguments =
                 new Dictionary<string, object?>
@@ -68,7 +77,7 @@ namespace KindRaise.Infrastructure.Messaging.RabbitMQ
             await channel.QueueBindAsync(
                 queue: DonationRequestsQueue,
                 exchange: DonationsExchange,
-                routingKey: DonationRequestedRoutingKey,
+                routingKey: RabbitMQMessageRoutingKeys.DonationRequested,
                 cancellationToken: cancellationToken);
 
             // Retry queue
@@ -78,7 +87,7 @@ namespace KindRaise.Infrastructure.Messaging.RabbitMQ
                     ["x-message-ttl"] = RetryDelayMilliseconds,
                     ["x-dead-letter-exchange"] = DonationsExchange,
                     ["x-dead-letter-routing-key"] =
-                        DonationRequestedRoutingKey
+                        RabbitMQMessageRoutingKeys.DonationRequested
                 };
 
             await channel.QueueDeclareAsync(
@@ -92,7 +101,7 @@ namespace KindRaise.Infrastructure.Messaging.RabbitMQ
             await channel.QueueBindAsync(
                 queue: RetryQueue,
                 exchange: RetryExchange,
-                routingKey: DonationRequestedRoutingKey,
+                routingKey: RabbitMQMessageRoutingKeys.DonationRequested,
                 cancellationToken: cancellationToken);
 
             // Dead Letter Queue

@@ -1,4 +1,5 @@
-﻿using KindRaise.Contracts.Donations;
+﻿using KindRaise.Application.Payments;
+using KindRaise.Contracts.Donations;
 using KindRaise.Infrastructure.Messaging.RabbitMQ;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
@@ -7,7 +8,9 @@ using System.Text.Json;
 
 namespace KindRaise.DonationWorker
 {
-    public sealed class DonationRequestConsumer(ILogger<DonationRequestConsumer> logger)
+    public sealed class DonationRequestConsumer(
+        ILogger<DonationRequestConsumer> logger,
+        IServiceScopeFactory serviceScopeFactory)
     {
         public async Task StartAsync(IChannel channel, CancellationToken cancellationToken)
         {
@@ -27,17 +30,6 @@ namespace KindRaise.DonationWorker
             logger.LogInformation(
                 "Started consuming messages from queue {QueueName}",
                 RabbitMQTopology.DonationRequestsQueue);
-
-            try 
-            {
-                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
-            }
-            
-            catch (OperationCanceledException) 
-                when (cancellationToken.IsCancellationRequested)
-            {
-                logger.LogInformation("Donation request consumer is stopping.");
-            }
         }
 
         private async Task HandleMessageAsync(
@@ -74,7 +66,14 @@ namespace KindRaise.DonationWorker
                    donationRequested.Amount,
                    attemptNumber);
 
-                await ProcessDonationAsync(donationRequested, cancellationToken);
+                await using var scope =serviceScopeFactory.CreateAsyncScope();
+
+                var paymentProcessingService = scope.ServiceProvider
+                        .GetRequiredService<IPaymentProcessingService>();
+
+                await paymentProcessingService.ProcessAsync(
+                    donationRequested.DonationId,
+                    cancellationToken);
 
                 await channel.BasicAckAsync(
                     deliveryTag: deliveryTag,
@@ -106,7 +105,18 @@ namespace KindRaise.DonationWorker
 
             catch (Exception exception)
             {
-                await HandleProcessingFailureAsync(
+                if (IsRetryable(exception))
+                {
+                    await HandleProcessingFailureAsync(
+                        channel,
+                        eventArgs,
+                        exception,
+                        cancellationToken);
+
+                    return;
+                }
+
+                await HandlePermanentFailureAsync(
                     channel,
                     eventArgs,
                     exception,
@@ -182,7 +192,7 @@ namespace KindRaise.DonationWorker
 
             await channel.BasicPublishAsync(
                 exchange: RabbitMQTopology.RetryExchange,
-                routingKey: RabbitMQTopology.DonationRequestedRoutingKey,
+                routingKey: RabbitMQMessageRoutingKeys.DonationRequested,
                 mandatory: false,
                 basicProperties: properties,
                 body: eventArgs.Body,
@@ -223,14 +233,26 @@ namespace KindRaise.DonationWorker
             };
         }
 
-        private Task ProcessDonationAsync(
-            DonationRequested message,
+        private async Task HandlePermanentFailureAsync(
+            IChannel channel,
+            BasicDeliverEventArgs eventArgs,
+            Exception exception,
             CancellationToken cancellationToken)
         {
-            logger.LogInformation("Processing donation {DonationId}.", message.DonationId);
+            logger.LogError(
+                exception,
+                "Donation processing failed permanently. Sending message to DLQ.");
 
-            // Substituir pelo processamento real.
-            return Task.CompletedTask;
+            await channel.BasicNackAsync(
+                deliveryTag: eventArgs.DeliveryTag,
+                multiple: false,
+                requeue: false,
+                cancellationToken: cancellationToken);
+        }
+
+        private static bool IsRetryable(Exception exception)
+        {
+            return exception is TemporaryPaymentFailureException;
         }
     }
 }

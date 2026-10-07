@@ -5,14 +5,17 @@ using System.Text.Json;
 namespace KindRaise.Infrastructure.Messaging.RabbitMQ
 {
     public sealed class RabbitMQMessagePublisher(
-        RabbitMQConnection rabbitMQConnection,
-        RabbitMQOptions options) : IMessagePublisher
+        RabbitMQConnection rabbitMQConnection) 
+        : IMessagePublisher
     {
         public async Task PublishAsync<T>(
             T message,
-            string routingKey,
             CancellationToken cancellationToken)
         {
+            ArgumentNullException.ThrowIfNull(message);
+
+            var routing = RabbitMQMessageRouting.GetRouting<T>();
+
             var connection = await rabbitMQConnection.GetConnectionAsync(cancellationToken);
 
             await using var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
@@ -22,12 +25,14 @@ namespace KindRaise.Infrastructure.Messaging.RabbitMQ
             var properties = new BasicProperties
             {
                 ContentType = "application/json",
-                DeliveryMode = DeliveryModes.Persistent
+                ContentEncoding = "utf-8",
+                DeliveryMode = DeliveryModes.Persistent,
+                Type = typeof(T).FullName
             };
 
             await channel.BasicPublishAsync(
-                exchange: options.ExchangeName,
-                routingKey: routingKey,
+                exchange: routing.Exchange,
+                routingKey: routing.RoutingKey,
                 mandatory: false,
                 basicProperties: properties,
                 body: body,
