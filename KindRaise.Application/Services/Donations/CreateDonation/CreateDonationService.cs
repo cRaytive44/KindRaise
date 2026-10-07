@@ -62,7 +62,6 @@ namespace KindRaise.Application.Services.Donations.CreateDonation
 
             await _messagePublisher.PublishAsync(
                 message,
-                "donation.requested",
                 cancellationToken);
 
             return new CreateDonationResponse

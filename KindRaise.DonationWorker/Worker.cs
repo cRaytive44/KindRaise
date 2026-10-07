@@ -7,6 +7,7 @@ namespace DonationWorker
     public class Worker(
         ILogger<Worker> logger,
         ILogger<DonationRequestConsumer> consumerLogger,
+        IServiceScopeFactory serviceScopeFactory,
         IConfiguration configuration) : BackgroundService
     {
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -29,9 +30,6 @@ namespace DonationWorker
 
                 VirtualHost = configuration["RabbitMQ:VirtualHost"]
                 ?? "/",
-
-                ExchangeName = configuration["RabbitMQ:ExchangeName"]
-                ?? "kindraise.donations"
             };
 
             var factory = new ConnectionFactory
@@ -68,18 +66,17 @@ namespace DonationWorker
                cancellationToken: stoppingToken);
             logger.LogInformation("RabbitMQ QoS configured. PrefetchCount: {PrefetchCount}", 1);
 
-            var consumer = new DonationRequestConsumer(consumerLogger);
+            var consumer = new DonationRequestConsumer(consumerLogger, serviceScopeFactory);
             await consumer.StartAsync(channel, stoppingToken);
 
             try
             {
                 await Task.Delay(Timeout.InfiniteTimeSpan, stoppingToken);
             }
-            
             catch (OperationCanceledException)
                 when (stoppingToken.IsCancellationRequested)
             {
-                logger.LogInformation("DonationWorker is stopping.");
+                logger.LogInformation("Donation worker is stopping.");
             }
         }
     }

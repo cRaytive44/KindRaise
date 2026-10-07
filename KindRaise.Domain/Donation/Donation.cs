@@ -19,11 +19,47 @@
             Amount = amount;
         }
 
-        public Donation()
+        private Donation()
         {
             CampaignId = Guid.Empty;
             DonorName = string.Empty;
             Amount = 1;
         }
-    } 
+
+        public void StartProcessing()
+        {
+            if (ProcessingState != ProcessingState.Pending)
+            {
+                throw new InvalidOperationException("Donation must be in Pending state to start processing.");
+            }
+            ProcessingState = ProcessingState.Processing;
+        }
+
+        public void MarkAsProcessed()
+        {
+            if (ProcessingState != ProcessingState.Processing)
+            {
+                throw new InvalidOperationException("Donation must be in Processing state to mark as processed.");
+            }
+            ProcessingState = ProcessingState.Processed;
+        }
+
+        public void MarkAsRejected()
+        {
+            if (ProcessingState != ProcessingState.Processing)
+            {
+                throw new InvalidOperationException("Donation must be in Processing state to mark as rejected.");
+            }
+            ProcessingState = ProcessingState.Rejected;
+        }
+
+        public void MarkAsTemporaryFailure()
+        {
+            if (ProcessingState != ProcessingState.Processing)
+            {
+                throw new InvalidOperationException("Donation must be in Processing state to mark as temporary failure.");
+            }
+            ProcessingState = ProcessingState.TemporaryFailure;
+        }
+    }
 }
