@@ -6,7 +6,7 @@ using RabbitMQ.Client.Events;
 using System.Text;
 using System.Text.Json;
 
-namespace KindRaise.DonationWorker
+namespace KindRaise.DonationWorker.Consumers
 {
     public sealed class DonationRequestConsumer(
         ILogger<DonationRequestConsumer> logger,
@@ -38,6 +38,11 @@ namespace KindRaise.DonationWorker
             CancellationToken cancellationToken) 
         {
             var deliveryTag = eventArgs.DeliveryTag;
+
+            logger.LogInformation(
+                "PaymentConfirmed received. MessageId: {MessageId}, DeliveryTag: {DeliveryTag}",
+                eventArgs.BasicProperties.MessageId,
+                eventArgs.DeliveryTag);
 
             try
             {
@@ -182,7 +187,12 @@ namespace KindRaise.DonationWorker
                 ContentType = eventArgs.BasicProperties.ContentType
                     ?? "application/json",
 
+                ContentEncoding = eventArgs.BasicProperties.ContentEncoding
+                    ?? "utf-8",
+
                 DeliveryMode = DeliveryModes.Persistent,
+
+                MessageId = eventArgs.BasicProperties.MessageId,
 
                 Headers = new Dictionary<string, object?>
                 {

@@ -1,4 +1,4 @@
-using KindRaise.DonationWorker;
+using KindRaise.DonationWorker.Consumers;
 using KindRaise.Infrastructure.Messaging.RabbitMQ;
 using RabbitMQ.Client;
 

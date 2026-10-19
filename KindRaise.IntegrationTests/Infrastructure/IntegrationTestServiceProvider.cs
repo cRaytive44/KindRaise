@@ -1,4 +1,5 @@
-﻿using KindRaise.Application.Donations;
+﻿using KindRaise.Application.Campaigns;
+using KindRaise.Application.Donations;
 using KindRaise.Application.Messaging;
 using KindRaise.Application.Payments;
 using KindRaise.Application.Services;
@@ -28,6 +29,7 @@ namespace KindRaise.IntegrationTests.Infrastructure
             services.AddDbContext<KindRaiseDbContext>(options =>
                 options.UseNpgsql(fixture.PostgreSqlConnectionString));
 
+            services.AddScoped<ICampaignRepository, EfCampaignRepository>();
             services.AddScoped<IDonationRepository, EfDonationRepository>();
             services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 
@@ -53,6 +55,8 @@ namespace KindRaise.IntegrationTests.Infrastructure
 
             services.AddSingleton<RabbitMQConnection>();
             services.AddScoped<IMessagePublisher, RabbitMQMessagePublisher>();
+
+            services.AddScoped<IProcessedMessageRepository, EfProcessedMessageRepository>();
 
             return services.BuildServiceProvider();
         }
