@@ -17,6 +17,9 @@ namespace KindRaise.Infrastructure.Messaging.RabbitMQ
         public const string DeadLetterQueue = "kindraise.donation-requests.dlq";
         public const string DeadLetterRoutingKey = "donation.dead";
 
+        // Payment confirmed queue name
+        public const string PaymentConfirmedQueue = "kindraise.payment-confirmed";
+
         // Events exchange name
         public const string EventsExchange = "kindraise.events";
 
@@ -116,6 +119,21 @@ namespace KindRaise.Infrastructure.Messaging.RabbitMQ
                 queue: DeadLetterQueue,
                 exchange: DeadLetterExchange,
                 routingKey: DeadLetterRoutingKey,
+                cancellationToken: cancellationToken);
+
+            // Payment confirmed queue
+            await channel.QueueDeclareAsync(
+                queue: PaymentConfirmedQueue,
+                durable: true,
+                exclusive: false,
+                autoDelete: false,
+                arguments: null,
+                cancellationToken: cancellationToken);
+
+            await channel.QueueBindAsync(
+                queue: PaymentConfirmedQueue,
+                exchange: EventsExchange,
+                routingKey: RabbitMQMessageRoutingKeys.PaymentConfirmed,
                 cancellationToken: cancellationToken);
         }
     }

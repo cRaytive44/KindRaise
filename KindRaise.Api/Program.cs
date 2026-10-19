@@ -48,6 +48,8 @@ builder.Services.AddScoped<ICreateDonationService, CreateDonationService>();
 builder.Services.AddScoped<IGetDonationService, GetDonationService>();
 builder.Services.AddScoped<IGetDonationsService, GetDonationsService>();
 
+builder.Services.AddScoped<IProcessedMessageRepository, EfProcessedMessageRepository>();
+
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 

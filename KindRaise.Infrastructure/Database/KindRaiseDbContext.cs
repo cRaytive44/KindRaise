@@ -14,6 +14,8 @@ namespace KindRaise.Infrastructure.Database
         public DbSet<Campaign> Campaigns => Set<Campaign>();
         public DbSet<Donation> Donations => Set<Donation>();
 
+        public DbSet<ProcessedMessage> ProcessedMessages => Set<ProcessedMessage>();
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);

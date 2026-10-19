@@ -97,6 +97,20 @@ namespace KindRaise.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("KindRaise.Infrastructure.Database.ProcessedMessage", b =>
+                {
+                    b.Property<string>("MessageId")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<DateTimeOffset>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("MessageId");
+
+                    b.ToTable("ProcessedMessages", (string)null);
+                });
+
             modelBuilder.Entity("KindRaise.Domain.Donation.Donation", b =>
                 {
                     b.HasOne("KindRaise.Domain.Campaign.Campaign", null)

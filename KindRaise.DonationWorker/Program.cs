@@ -1,5 +1,7 @@
 using DonationWorker;
+using KindRaise.Application.Campaigns;
 using KindRaise.Application.Donations;
+using KindRaise.Application.Messaging;
 using KindRaise.Application.Payments;
 using KindRaise.Application.Services;
 using KindRaise.Infrastructure.Database;
@@ -12,7 +14,10 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddDbContext<KindRaiseDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("KindRaiseDb")));
 
+builder.Services.AddScoped<ICampaignRepository, EfCampaignRepository>();
+
 builder.Services.AddScoped<IDonationRepository, EfDonationRepository>();
+builder.Services.AddScoped<IProcessedMessageRepository, EfProcessedMessageRepository>();
 builder.Services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 
 builder.Services.Configure<FakePaymentProviderOptions>(
