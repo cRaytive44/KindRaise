@@ -29,7 +29,7 @@ builder.Services.AddDbContext<KindRaiseDbContext>(options =>
     options.UseNpgsql(
         builder.Configuration.GetConnectionString("KindRaiseDb")));
 
-// Services
+                               // Services
 builder.Services.AddScoped<ICampaignRepository, EfCampaignRepository>();
 builder.Services.AddScoped<IDonationRepository, EfDonationRepository>();
 builder.Services.AddScoped<IMessagePublisher, RabbitMQMessagePublisher>();
@@ -49,6 +49,7 @@ builder.Services.AddScoped<IGetDonationService, GetDonationService>();
 builder.Services.AddScoped<IGetDonationsService, GetDonationsService>();
 
 builder.Services.AddScoped<IProcessedMessageRepository, EfProcessedMessageRepository>();
+builder.Services.AddScoped<IOutboxRepository, EfOutboxRepository>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();

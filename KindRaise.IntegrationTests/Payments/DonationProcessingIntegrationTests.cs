@@ -1,10 +1,17 @@
-﻿using KindRaise.Application.Payments;
+﻿using FluentValidation;
+using KindRaise.Application.Donations.CreateDonation;
+using KindRaise.Application.Messaging;
+using KindRaise.Application.Payments;
+using KindRaise.Application.Services;
+using KindRaise.Application.Services.Donations.CreateDonation;
 using KindRaise.Contracts.Donations;
 using KindRaise.Contracts.Payments;
 using KindRaise.Domain.Campaign;
 using KindRaise.Domain.Donation;
 using KindRaise.DonationWorker.Consumers;
+using KindRaise.DonationWorker.OutboxMessages;
 using KindRaise.Infrastructure.Database;
+using KindRaise.Infrastructure.Database.Repositories;
 using KindRaise.Infrastructure.Messaging.RabbitMQ;
 using KindRaise.Infrastructure.Payments;
 using KindRaise.IntegrationTests.Infrastructure;
@@ -22,6 +29,91 @@ namespace KindRaise.IntegrationTests.Payments
         ITestOutputHelper output)
         : IClassFixture<IntegrationTestFixture>
     {
+
+        private static async Task<Donation> WaitForDonationStateAsync(
+             string connectionString,
+             Guid donationId,
+             ProcessingState expectedState,
+             CancellationToken cancellationToken)
+        {
+            try
+            {
+                while (true)
+                {
+                    await using var dbContext = new KindRaiseDbContext(
+                        new DbContextOptionsBuilder<KindRaiseDbContext>()
+                            .UseNpgsql(connectionString)
+                            .Options);
+
+                    var donation = await dbContext.Donations
+                        .AsNoTracking()
+                        .SingleAsync(
+                            d => d.Id == donationId,
+                            cancellationToken);
+
+                    if (donation.ProcessingState == expectedState)
+                    {
+                        return donation;
+                    }
+
+                    await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
+                }
+            }
+            catch (OperationCanceledException)
+                when (cancellationToken.IsCancellationRequested)
+            {
+                throw new TimeoutException(
+                    $"Donation '{donationId}' did not reach state " +
+                    $"'{expectedState}' within the expected timeout.");
+            }
+        }
+
+        private static async Task<string> CreateTestEventQueueAsync(
+            IChannel channel,
+            string routingKey,
+            CancellationToken cancellationToken)
+        {
+            var queue = await channel.QueueDeclareAsync(
+                queue: string.Empty,
+                durable: false,
+                exclusive: true,
+                autoDelete: true,
+                arguments: null,
+                cancellationToken: cancellationToken);
+
+            await channel.QueueBindAsync(
+                queue: queue.QueueName,
+                exchange: RabbitMQTopology.EventsExchange,
+                routingKey: routingKey,
+                cancellationToken: cancellationToken);
+
+            return queue.QueueName;
+        }
+
+        private static async Task<T> WaitForEventAsync<T>(
+            IChannel channel,
+            string queueName,
+            CancellationToken cancellationToken)
+        {
+            while (true)
+            {
+                var result = await channel.BasicGetAsync(
+                    queue: queueName,
+                    autoAck: true,
+                    cancellationToken: cancellationToken);
+
+                if (result is not null)
+                {
+                    return JsonSerializer.Deserialize<T>(result.Body.Span)
+                        ?? throw new InvalidOperationException(
+                            $"Could not deserialize event '{typeof(T).Name}'.");
+                }
+
+                await Task.Delay(
+                    TimeSpan.FromMilliseconds(100),
+                    cancellationToken);
+            }
+        }
 
         [Fact]
         public async Task DonationRequested_WhenPaymentSucceeds_DonationBecomesProcessed()
@@ -75,7 +167,6 @@ namespace KindRaise.IntegrationTests.Payments
 
             await RabbitMQTopology.ConfigureAsync(
                 channel,
-                rabbitOptions,
                 CancellationToken.None);
 
             await channel.BasicQosAsync(
@@ -213,7 +304,6 @@ namespace KindRaise.IntegrationTests.Payments
 
             await RabbitMQTopology.ConfigureAsync(
                 channel,
-                rabbitOptions,
                 CancellationToken.None);
 
             await channel.BasicQosAsync(
@@ -325,7 +415,6 @@ namespace KindRaise.IntegrationTests.Payments
 
             await RabbitMQTopology.ConfigureAsync(
                 channel,
-                rabbitOptions,
                 CancellationToken.None);
 
             await channel.BasicQosAsync(
@@ -447,12 +536,10 @@ namespace KindRaise.IntegrationTests.Payments
 
             await RabbitMQTopology.ConfigureAsync(
                 consumerChannel,
-                options,
                 CancellationToken.None);
 
             await RabbitMQTopology.ConfigureAsync(
                 publisherChannel,
-                options,
                 CancellationToken.None);
 
             await consumerChannel.BasicQosAsync(
@@ -563,88 +650,305 @@ namespace KindRaise.IntegrationTests.Payments
             }
         }
 
-        private static async Task<Donation> WaitForDonationStateAsync(
-             string connectionString,
-             Guid donationId,
-             ProcessingState expectedState,
-             CancellationToken cancellationToken)
+        [Fact]
+        public async Task Outbox_WhenPublishingFails_MessageRemainsPendingAndIsPublishedOnRetry()
         {
-            try
-            {
-                while (true)
+            // Arrange
+            var fakePublisher = new FailOnceOutboxPublisher();
+
+            await using var serviceProvider = IntegrationTestServiceProvider.Create(
+                fixture,
+                configureServices: services =>
                 {
-                    await using var dbContext = new KindRaiseDbContext(
-                        new DbContextOptionsBuilder<KindRaiseDbContext>()
-                            .UseNpgsql(connectionString)
-                            .Options);
+                    services.AddSingleton(fakePublisher);
+                    services.AddSingleton<IOutboxMessagePublisher>(fakePublisher);
+                    services.AddScoped<OutboxMessageProcessor>();
+                });
 
-                    var donation = await dbContext.Donations
-                        .AsNoTracking()
-                        .SingleAsync(
-                            d => d.Id == donationId,
-                            cancellationToken);
+            await using (var scope = serviceProvider.CreateAsyncScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<KindRaiseDbContext>();
 
-                    if (donation.ProcessingState == expectedState)
+                await dbContext.Database.MigrateAsync();
+
+                var message = new DonationRequested(
+                    Guid.NewGuid(),
+                    Guid.NewGuid(),
+                    50m);
+
+                var outboxMessage = new OutboxMessage(
+                    typeof(DonationRequested).FullName!,
+                    JsonSerializer.Serialize(message),
+                    DateTimeOffset.UtcNow);
+
+                dbContext.OutboxMessages.Add(outboxMessage);
+
+                await dbContext.SaveChangesAsync();
+            }
+
+            // Act 1: first publish fails
+            await using (var scope = serviceProvider.CreateAsyncScope())
+            {
+                var processor = scope.ServiceProvider.GetRequiredService<OutboxMessageProcessor>();
+                await processor.ProcessPendingAsync(CancellationToken.None);
+            }
+
+            // Assert 1
+            await using (var scope = serviceProvider.CreateAsyncScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<KindRaiseDbContext>();
+                var outboxMessage = await dbContext.OutboxMessages.SingleAsync();
+
+                Assert.Null(outboxMessage.PublishedAt);
+                Assert.Equal(1, outboxMessage.Attempts);
+                Assert.Equal("Simulated RabbitMQ failure.", outboxMessage.LastError);
+            }
+
+            Assert.Equal(1, fakePublisher.CallCount);
+
+            // Act 2: second publish succeeds
+            await using (var scope = serviceProvider.CreateAsyncScope())
+            {
+                var processor = scope.ServiceProvider.GetRequiredService<OutboxMessageProcessor>();
+                await processor.ProcessPendingAsync(CancellationToken.None);
+            }
+
+            // Assert 2
+            await using (var scope = serviceProvider.CreateAsyncScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<KindRaiseDbContext>();
+                var outboxMessage = await dbContext.OutboxMessages.SingleAsync();
+
+                Assert.NotNull(outboxMessage.PublishedAt);
+                Assert.Equal(1, outboxMessage.Attempts);
+                Assert.Null(outboxMessage.LastError);
+            }
+
+            Assert.Equal(2, fakePublisher.CallCount);
+        }
+
+        [Fact]
+        public async Task CreateDonation_WhenSuccessful_PersistsDonationAndOutboxMessage()
+        {
+            // Arrange
+            await using var serviceProvider = IntegrationTestServiceProvider.Create(
+                fixture,
+                configureServices: services =>
+                {
+                    services.AddScoped<ICreateDonationService, CreateDonationService>();
+                    services.AddScoped<IValidator<CreateDonationRequest>, TestCreateDonationRequestValidator>();
+                });
+
+            Guid campaignId;
+            Guid donationId;
+
+            await using (var scope = serviceProvider.CreateAsyncScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<KindRaiseDbContext>();
+
+                await dbContext.Database.MigrateAsync();
+
+                var campaign = new Campaign(
+                    "Outbox Atomicity Test",
+                    "Campaign for transactional outbox testing.",
+                    10_000m,
+                    DateTimeOffset.UtcNow.AddDays(-1),
+                    DateTimeOffset.UtcNow.AddDays(30));
+
+                campaignId = campaign.Id;
+
+                dbContext.Campaigns.Add(campaign);
+                await dbContext.SaveChangesAsync();
+
+                var service = scope.ServiceProvider.GetRequiredService<ICreateDonationService>();
+
+                var response = await service.ExecuteAsync(
+                    new CreateDonationRequest
                     {
-                        return donation;
-                    }
+                        CampaignId = campaignId,
+                        DonorName = "Outbox Test Donor",
+                        Amount = 50m
+                    },
+                    CancellationToken.None);
 
-                    await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
-                }
+                donationId = response.Id;
             }
-            catch (OperationCanceledException)
-                when (cancellationToken.IsCancellationRequested)
+
+            // Assert
+            await using (var scope = serviceProvider.CreateAsyncScope())
             {
-                throw new TimeoutException(
-                    $"Donation '{donationId}' did not reach state " +
-                    $"'{expectedState}' within the expected timeout.");
+                var dbContext = scope.ServiceProvider.GetRequiredService<KindRaiseDbContext>();
+
+                var donation = await dbContext.Donations
+                    .AsNoTracking()
+                    .SingleAsync(d =>
+                        d.CampaignId == campaignId &&
+                        d.DonorName == "Outbox Test Donor");
+
+                var outboxMessage = await dbContext.OutboxMessages
+                    .AsNoTracking()
+                    .SingleAsync(m =>
+                        m.Type == typeof(DonationRequested).FullName &&
+                        m.Content.Contains(donationId.ToString()));
+
+                var eventMessage = JsonSerializer.Deserialize<DonationRequested>(outboxMessage.Content);
+
+                Assert.Equal(campaignId, donation.CampaignId);
+                Assert.Equal(50m, donation.Amount);
+
+                Assert.NotNull(eventMessage);
+                Assert.Equal(donationId, eventMessage.DonationId);
+                Assert.Equal(campaignId, eventMessage.CampaignId);
+                Assert.Equal(50m, eventMessage.Amount);
+
+                Assert.Null(outboxMessage.PublishedAt);
             }
         }
 
-        private static async Task<string> CreateTestEventQueueAsync(
-            IChannel channel,
-            string routingKey,
-            CancellationToken cancellationToken)
+        [Fact]
+        public async Task CreateDonation_WhenCommitFails_RollsBackDonationAndOutboxMessage()
         {
-            var queue = await channel.QueueDeclareAsync(
-                queue: string.Empty,
-                durable: false,
-                exclusive: true,
-                autoDelete: true,
-                arguments: null,
-                cancellationToken: cancellationToken);
-
-            await channel.QueueBindAsync(
-                queue: queue.QueueName,
-                exchange: RabbitMQTopology.EventsExchange,
-                routingKey: routingKey,
-                cancellationToken: cancellationToken);
-
-            return queue.QueueName;
-        }
-
-        private static async Task<T> WaitForEventAsync<T>(
-            IChannel channel,
-            string queueName,
-            CancellationToken cancellationToken)
-        {
-            while (true)
-            {
-                var result = await channel.BasicGetAsync(
-                    queue: queueName,
-                    autoAck: true,
-                    cancellationToken: cancellationToken);
-
-                if (result is not null)
+            // Arrange
+            await using var serviceProvider = IntegrationTestServiceProvider.Create(
+                fixture,
+                configureServices: services =>
                 {
-                    return JsonSerializer.Deserialize<T>(result.Body.Span)
-                        ?? throw new InvalidOperationException(
-                            $"Could not deserialize event '{typeof(T).Name}'.");
-                }
+                    services.AddScoped<ICreateDonationService, CreateDonationService>();
+                    services.AddScoped<IValidator<CreateDonationRequest>, TestCreateDonationRequestValidator>();
+                    services.AddScoped<IUnitOfWork>(sp => new FailOnCommitUnitOfWork(
+                        new EfUnitOfWork(sp.GetRequiredService<KindRaiseDbContext>())));
+                });
 
-                await Task.Delay(
-                    TimeSpan.FromMilliseconds(100),
-                    cancellationToken);
+            Guid campaignId;
+
+            await using (var scope = serviceProvider.CreateAsyncScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<KindRaiseDbContext>();
+
+                await dbContext.Database.MigrateAsync();
+
+                var campaign = new Campaign(
+                    "Outbox Rollback Test",
+                    "Campaign for transaction rollback testing.",
+                    10_000m,
+                    DateTimeOffset.UtcNow.AddDays(-1),
+                    DateTimeOffset.UtcNow.AddDays(30));
+
+                campaignId = campaign.Id;
+
+                dbContext.Campaigns.Add(campaign);
+                await dbContext.SaveChangesAsync();
+            }
+
+            // Act
+            await using (var scope = serviceProvider.CreateAsyncScope())
+            {
+                var service = scope.ServiceProvider.GetRequiredService<ICreateDonationService>();
+
+                await Assert.ThrowsAsync<InvalidOperationException>(
+                    () => service.ExecuteAsync(
+                        new CreateDonationRequest
+                        {
+                            CampaignId = campaignId,
+                            DonorName = "Rollback Test Donor",
+                            Amount = 75m
+                        },
+                        CancellationToken.None));
+            }
+
+            // Assert
+            await using (var scope = serviceProvider.CreateAsyncScope())
+            {
+                var dbContext = scope.ServiceProvider
+                    .GetRequiredService<KindRaiseDbContext>();
+
+                var donationCount = await dbContext.Donations
+                    .CountAsync(d =>
+                        d.CampaignId == campaignId &&
+                        d.DonorName == "Rollback Test Donor");
+
+                var outboxCount = await dbContext.OutboxMessages
+                    .CountAsync(m =>
+                        m.Type == typeof(DonationRequested).FullName &&
+                        m.Content.Contains(campaignId.ToString()));
+
+                Assert.Equal(0, donationCount);
+                Assert.Equal(0, outboxCount);
+            }
+        }
+
+
+        [Fact]
+        public async Task OutboxProcessor_WhenPublishingFails_RetriesAndMarksMessageAsPublished()
+        {
+            // Arrange
+            await using var serviceProvider = IntegrationTestServiceProvider.Create(
+                fixture,
+                configureServices: services =>
+                {
+                    services.AddSingleton<FailOnceOutboxMessagePublisher>();
+
+                    services.AddSingleton<IOutboxMessagePublisher>(sp =>
+                        sp.GetRequiredService<FailOnceOutboxMessagePublisher>());
+
+                    services.AddScoped<OutboxMessageProcessor>();
+                });
+
+            Guid messageId;
+
+            await using (var scope = serviceProvider.CreateAsyncScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<KindRaiseDbContext>();
+
+                await dbContext.Database.MigrateAsync();
+                await dbContext.OutboxMessages.ExecuteDeleteAsync();
+
+                var message = new OutboxMessage(
+                    typeof(DonationRequested).FullName!,
+                    JsonSerializer.Serialize(new DonationRequested(
+                        Guid.NewGuid(),
+                        Guid.NewGuid(),
+                        50m)),
+                    DateTimeOffset.UtcNow);
+
+                messageId = message.Id;
+
+                dbContext.OutboxMessages.Add(message);
+                await dbContext.SaveChangesAsync();
+
+                var processor = scope.ServiceProvider.GetRequiredService<OutboxMessageProcessor>();
+
+                // Act - first try: fails
+                var firstResult = await processor.ProcessPendingAsync(CancellationToken.None);
+
+                // Assert - message remains pending
+                var afterFirstAttempt = await dbContext.OutboxMessages
+                    .AsNoTracking()
+                    .SingleAsync(m => m.Id == messageId);
+
+                Assert.True(firstResult);
+                Assert.Null(afterFirstAttempt.PublishedAt);
+                Assert.Equal(1, afterFirstAttempt.Attempts);
+                Assert.NotNull(afterFirstAttempt.LastError);
+
+                // Act - second try: success
+                var secondResult = await processor.ProcessPendingAsync(CancellationToken.None);
+
+                // Assert - the message gets published
+                var afterSecondAttempt = await dbContext.OutboxMessages
+                    .AsNoTracking()
+                    .SingleAsync(m => m.Id == messageId);
+
+                var publisher = scope.ServiceProvider.GetRequiredService<FailOnceOutboxMessagePublisher>();
+
+                Assert.True(secondResult);
+                Assert.NotNull(afterSecondAttempt.PublishedAt);
+                Assert.Equal(1, afterSecondAttempt.Attempts);
+                Assert.Null(afterSecondAttempt.LastError);
+
+                Assert.Equal(2, publisher.Calls);
+                Assert.Equal(2, publisher.MessageIds.Count);
+                Assert.All(publisher.MessageIds, id => Assert.Equal(messageId, id));
             }
         }
     }

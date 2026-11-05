@@ -29,7 +29,6 @@ namespace KindRaise.Infrastructure.Messaging.RabbitMQ
 
         public static async Task ConfigureAsync(
             IChannel channel,
-            RabbitMQOptions options,
             CancellationToken cancellationToken)
         {
             // Exchanges

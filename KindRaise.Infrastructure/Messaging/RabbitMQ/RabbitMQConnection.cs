@@ -23,7 +23,7 @@ namespace KindRaise.Infrastructure.Messaging.RabbitMQ
 
         public async Task<IConnection> GetConnectionAsync(CancellationToken cancellationToken = default)
         {
-            if (_connection is not null && _connection.IsOpen)
+            if (_connection is { IsOpen: true })
             {
                 return _connection;
             }
@@ -32,9 +32,14 @@ namespace KindRaise.Infrastructure.Messaging.RabbitMQ
 
             try
             {
-                if (_connection is not null && _connection.IsOpen)
+                if (_connection is { IsOpen: true })
                 {
                     return _connection;
+                }
+
+                if (_connection is not null)
+                {
+                    await _connection.DisposeAsync();
                 }
 
                 _connection = await _factory.CreateConnectionAsync(cancellationToken);
@@ -48,12 +53,15 @@ namespace KindRaise.Infrastructure.Messaging.RabbitMQ
 
         public async ValueTask DisposeAsync()
         {
-            if (_connection is not null)
+            try
             {
-                await _connection.DisposeAsync();
+                if (_connection is not null)
+                    await _connection.DisposeAsync();
             }
-
-           _lock.Dispose();
+            finally
+            {
+                _lock.Dispose();
+            }
         }
     }
 }

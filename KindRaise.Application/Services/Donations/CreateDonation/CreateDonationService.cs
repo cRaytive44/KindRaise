@@ -4,6 +4,7 @@ using KindRaise.Application.Donations;
 using KindRaise.Application.Donations.CreateDonation;
 using KindRaise.Application.Messaging;
 using KindRaise.Contracts.Donations;
+using System.Text.Json;
 
 namespace KindRaise.Application.Services.Donations.CreateDonation
 {
@@ -11,22 +12,22 @@ namespace KindRaise.Application.Services.Donations.CreateDonation
     {
         private readonly ICampaignRepository _campaignRepository;
         private readonly IDonationRepository _donationRepository;
+        private readonly IOutboxRepository _outboxRepository;
         private readonly IUnitOfWork _unitOfWork;
-        private readonly IMessagePublisher _messagePublisher;
         private readonly IValidator<CreateDonationRequest> _validator;
 
 
         public CreateDonationService(
             ICampaignRepository campaignRepository,
             IDonationRepository donationRepository,
+            IOutboxRepository outboxRepository,
             IUnitOfWork unitOfWork,
-            IMessagePublisher messagePublisher,
             IValidator<CreateDonationRequest> validator)
         {
             _campaignRepository = campaignRepository;
             _donationRepository = donationRepository;
+            _outboxRepository = outboxRepository;
             _unitOfWork = unitOfWork;
-            _messagePublisher = messagePublisher;
             _validator = validator;
         }
 
@@ -52,17 +53,29 @@ namespace KindRaise.Application.Services.Donations.CreateDonation
                 request.Amount
             );
 
-            await _donationRepository.AddAsync(donation, cancellationToken);
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-
             var message = new DonationRequested(
                 donation.Id,
                 donation.CampaignId,
                 donation.Amount);
 
-            await _messagePublisher.PublishAsync(
-                message,
-                cancellationToken);
+            var content = JsonSerializer.Serialize(message);
+            var type = typeof(DonationRequested).FullName!;
+            var occurredAt = DateTimeOffset.UtcNow;
+
+            await _unitOfWork.BeginTransactionAsync(cancellationToken);
+
+            try
+            {
+                await _donationRepository.AddAsync(donation, cancellationToken);
+                await _outboxRepository.AddAsync(type, content, occurredAt, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+                await _unitOfWork.CommitTransactionAsync(cancellationToken);
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+                throw;
+            }
 
             return new CreateDonationResponse
             {

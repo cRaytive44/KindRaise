@@ -1,8 +1,12 @@
-﻿using KindRaise.Application.Campaigns;
+﻿using FluentValidation;
+using KindRaise.Application.Campaigns;
 using KindRaise.Application.Donations;
+using KindRaise.Application.Donations.CreateDonation;
 using KindRaise.Application.Messaging;
 using KindRaise.Application.Payments;
 using KindRaise.Application.Services;
+using KindRaise.Application.Services.Donations.CreateDonation;
+using KindRaise.DonationWorker.OutboxMessages;
 using KindRaise.Infrastructure.Database;
 using KindRaise.Infrastructure.Database.Repositories;
 using KindRaise.Infrastructure.Messaging.RabbitMQ;
@@ -17,7 +21,8 @@ namespace KindRaise.IntegrationTests.Infrastructure
     {
         public static ServiceProvider Create(
             IntegrationTestFixture fixture,
-            Action<FakePaymentProviderOptions>? configurePaymentProvider = null)
+            Action<FakePaymentProviderOptions>? configurePaymentProvider = null,
+            Action<IServiceCollection>? configureServices = null)
         {
             var services = new ServiceCollection();
 
@@ -57,6 +62,17 @@ namespace KindRaise.IntegrationTests.Infrastructure
             services.AddScoped<IMessagePublisher, RabbitMQMessagePublisher>();
 
             services.AddScoped<IProcessedMessageRepository, EfProcessedMessageRepository>();
+            services.AddScoped<IOutboxRepository, EfOutboxRepository>();
+
+            services.AddScoped<ICreateDonationService, CreateDonationService>();
+            services.AddScoped<IValidator<CreateDonationRequest>, TestCreateDonationRequestValidator>();
+
+            services.AddSingleton<FailOnceOutboxMessagePublisher>();
+            services.AddSingleton<IOutboxMessagePublisher>(sp => sp.GetRequiredService<FailOnceOutboxMessagePublisher>());
+
+            services.AddScoped<OutboxMessageProcessor>();
+
+            configureServices?.Invoke(services);
 
             return services.BuildServiceProvider();
         }
