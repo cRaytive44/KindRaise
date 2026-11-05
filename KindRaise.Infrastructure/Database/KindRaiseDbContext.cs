@@ -15,6 +15,7 @@ namespace KindRaise.Infrastructure.Database
         public DbSet<Donation> Donations => Set<Donation>();
 
         public DbSet<ProcessedMessage> ProcessedMessages => Set<ProcessedMessage>();
+        public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

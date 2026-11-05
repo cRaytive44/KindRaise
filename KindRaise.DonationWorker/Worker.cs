@@ -2,7 +2,7 @@ using KindRaise.DonationWorker.Consumers;
 using KindRaise.Infrastructure.Messaging.RabbitMQ;
 using RabbitMQ.Client;
 
-namespace DonationWorker
+namespace KindRaise.DonationWorker
 {
     public class Worker(
         ILogger<Worker> logger,
@@ -55,7 +55,6 @@ namespace DonationWorker
 
             await RabbitMQTopology.ConfigureAsync(
                 channel,
-                options,
                 stoppingToken);
             logger.LogInformation("RabbitMQ topology configured successfully.");
 
