@@ -28,6 +28,10 @@ namespace KindRaise.Infrastructure.Database.Configurations
             builder.Property(c => c.DonatedAmount)
                 .HasPrecision(9, 2);
 
+            builder.Property(c => c.Version)
+                .IsConcurrencyToken()
+                .HasDefaultValue(1);
+
             builder.Ignore(c => c.CampaignState);
 
             builder.ToTable("Campaigns", table =>

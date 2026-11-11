@@ -1,4 +1,5 @@
 ﻿using FluentValidation;
+using KindRaise.Application.Campaigns;
 using KindRaise.Application.Donations.CreateDonation;
 using KindRaise.Application.Messaging;
 using KindRaise.Application.Payments;
@@ -10,6 +11,7 @@ using KindRaise.Domain.Campaign;
 using KindRaise.Domain.Donation;
 using KindRaise.DonationWorker.Consumers;
 using KindRaise.DonationWorker.OutboxMessages;
+using KindRaise.DonationWorker.PaymentProcessor;
 using KindRaise.Infrastructure.Database;
 using KindRaise.Infrastructure.Database.Repositories;
 using KindRaise.Infrastructure.Messaging.RabbitMQ;
@@ -17,6 +19,7 @@ using KindRaise.Infrastructure.Payments;
 using KindRaise.IntegrationTests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using System.Text.Json;
@@ -556,7 +559,7 @@ namespace KindRaise.IntegrationTests.Payments
 
             var consumer = new PaymentConfirmedConsumer(
                 loggerFactory.CreateLogger<PaymentConfirmedConsumer>(),
-                serviceProvider.GetRequiredService<IServiceScopeFactory>());
+                serviceProvider.GetRequiredService<PaymentConfirmedProcessor>());
 
             using var cts = new CancellationTokenSource(
                 TimeSpan.FromSeconds(15));
@@ -950,6 +953,147 @@ namespace KindRaise.IntegrationTests.Payments
                 Assert.Equal(2, publisher.MessageIds.Count);
                 Assert.All(publisher.MessageIds, id => Assert.Equal(messageId, id));
             }
+        }
+
+
+        [Fact]
+        public async Task Campaign_WhenUpdatedConcurrently_DemonstratesLostUpdate()
+        {
+            // Arrange
+            await using var serviceProvider =
+                IntegrationTestServiceProvider.Create(fixture);
+
+            Guid campaignId;
+
+            await using (var scope = serviceProvider.CreateAsyncScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<KindRaiseDbContext>();
+
+                await dbContext.Database.MigrateAsync();
+
+                var campaign = new Campaign(
+                    "Concurrency Test",
+                    "Testing lost updates.",
+                    10_000m,
+                    DateTimeOffset.UtcNow.AddDays(-1),
+                    DateTimeOffset.UtcNow.AddDays(30));
+
+                campaign.AddDonation(900m);
+
+                campaignId = campaign.Id;
+
+                dbContext.Campaigns.Add(campaign);
+                await dbContext.SaveChangesAsync();
+            }
+
+            await using var scopeA = serviceProvider.CreateAsyncScope();
+            await using var scopeB = serviceProvider.CreateAsyncScope();
+
+            var dbContextA = scopeA.ServiceProvider.GetRequiredService<KindRaiseDbContext>();
+            var dbContextB = scopeB.ServiceProvider.GetRequiredService<KindRaiseDbContext>();
+
+            // Both read the same campaign amount
+            var campaignA = await dbContextA.Campaigns.SingleAsync(c => c.Id == campaignId);
+            var campaignB = await dbContextB.Campaigns.SingleAsync(c => c.Id == campaignId);
+
+            // Act - two concurrent updates
+            campaignA.AddDonation(100m);
+            campaignB.AddDonation(100m);
+
+            await dbContextA.SaveChangesAsync();
+            await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => dbContextB.SaveChangesAsync());
+
+            // Assert - demonstrates the lost update
+            await using var verificationScope = serviceProvider.CreateAsyncScope();
+
+            var verificationDbContext = verificationScope.ServiceProvider.GetRequiredService<KindRaiseDbContext>();
+            var finalCampaign = await verificationDbContext.Campaigns
+                .AsNoTracking()
+                .SingleAsync(c => c.Id == campaignId);
+
+            Assert.Equal(1_000m, finalCampaign.DonatedAmount);
+        }
+
+
+        [Fact]
+        public async Task PaymentConfirmed_WhenProcessedConcurrently_RetriesAndPreservesBothDonations()
+        {
+            // Arrange
+            await using var serviceProvider = IntegrationTestServiceProvider.Create(
+                fixture,
+                configureServices: services =>
+                {
+                    services.RemoveAll<ICampaignRepository>();
+                    services.AddSingleton<CampaignReadBarrier>();
+
+                    services.AddScoped<ICampaignRepository>(sp =>
+                        new CampaignReadBarrierRepository(
+                            new EfCampaignRepository(
+                                sp.GetRequiredService<KindRaiseDbContext>()),
+                            sp.GetRequiredService<CampaignReadBarrier>()));
+                });
+
+            Guid campaignId;
+
+            await using (var scope = serviceProvider.CreateAsyncScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<KindRaiseDbContext>();
+                await dbContext.Database.MigrateAsync();
+
+                var campaign = new Campaign(
+                    "Concurrency Test",
+                    "Campaign for concurrent payment processing.",
+                    10_000m,
+                    DateTimeOffset.UtcNow.AddDays(-1),
+                    DateTimeOffset.UtcNow.AddDays(30));
+
+                campaign.AddDonation(900m);
+                campaignId = campaign.Id;
+
+                dbContext.Campaigns.Add(campaign);
+                await dbContext.SaveChangesAsync();
+            }
+
+            var processor = serviceProvider.GetRequiredService<PaymentConfirmedProcessor>();
+
+            var message1 = new PaymentConfirmed(
+                Guid.NewGuid(),
+                campaignId,
+                100m);
+
+            var message2 = new PaymentConfirmed(
+                Guid.NewGuid(),
+                campaignId,
+                100m);
+
+            var messageId1 = Guid.NewGuid().ToString();
+            var messageId2 = Guid.NewGuid().ToString();
+
+            using var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+
+            // Act
+            await Task.WhenAll(
+                processor.ProcessAsync(
+                    message1,
+                    messageId1,
+                    cancellationTokenSource.Token),
+
+                processor.ProcessAsync(
+                    message2,
+                    messageId2,
+                    cancellationTokenSource.Token));
+
+            // Assert
+            await using var assertScope = serviceProvider.CreateAsyncScope();
+
+            var assertDbContext = assertScope.ServiceProvider
+                .GetRequiredService<KindRaiseDbContext>();
+
+            var updatedCampaign = await assertDbContext.Campaigns
+                .AsNoTracking()
+                .SingleAsync(c => c.Id == campaignId);
+
+            Assert.Equal(1_100m, updatedCampaign.DonatedAmount);
         }
     }
 }
