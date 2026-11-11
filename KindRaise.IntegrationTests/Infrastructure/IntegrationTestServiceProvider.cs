@@ -7,12 +7,14 @@ using KindRaise.Application.Payments;
 using KindRaise.Application.Services;
 using KindRaise.Application.Services.Donations.CreateDonation;
 using KindRaise.DonationWorker.OutboxMessages;
+using KindRaise.DonationWorker.PaymentProcessor;
 using KindRaise.Infrastructure.Database;
 using KindRaise.Infrastructure.Database.Repositories;
 using KindRaise.Infrastructure.Messaging.RabbitMQ;
 using KindRaise.Infrastructure.Payments;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 
 namespace KindRaise.IntegrationTests.Infrastructure
@@ -71,6 +73,7 @@ namespace KindRaise.IntegrationTests.Infrastructure
             services.AddSingleton<IOutboxMessagePublisher>(sp => sp.GetRequiredService<FailOnceOutboxMessagePublisher>());
 
             services.AddScoped<OutboxMessageProcessor>();
+            services.AddSingleton<PaymentConfirmedProcessor>();
 
             configureServices?.Invoke(services);
 

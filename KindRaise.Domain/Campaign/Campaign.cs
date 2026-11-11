@@ -11,6 +11,8 @@ namespace KindRaise.Domain.Campaign
         public DateTimeOffset StartDate { get; }
         public DateTimeOffset EndDate { get; }
         public decimal DonatedAmount { get; private set; } = 0;
+        public int Version { get; private set; } = 1;
+
         public CampaignState CampaignState
         {
             get
@@ -55,6 +57,7 @@ namespace KindRaise.Domain.Campaign
             ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amount);
 
             DonatedAmount += amount;
+            Version++;
         }
 
         public void EnsureCanBeDeleted()

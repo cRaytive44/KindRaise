@@ -5,6 +5,7 @@ using KindRaise.Application.Payments;
 using KindRaise.Application.Services;
 using KindRaise.DonationWorker;
 using KindRaise.DonationWorker.OutboxMessages;
+using KindRaise.DonationWorker.PaymentProcessor;
 using KindRaise.DonationWorker.Publishers;
 using KindRaise.Infrastructure.Database;
 using KindRaise.Infrastructure.Database.Repositories;
@@ -51,6 +52,8 @@ builder.Services.AddSingleton<RabbitMQConnection>();
 builder.Services.AddSingleton<IOutboxMessagePublisher, OutboxRabbitMQPublisher>();
 
 builder.Services.AddScoped<OutboxMessageProcessor>();
+
+builder.Services.AddSingleton<PaymentConfirmedProcessor>();
 
 builder.Services.AddHostedService<Worker>();
 builder.Services.AddHostedService<OutboxPublisherWorker>();
