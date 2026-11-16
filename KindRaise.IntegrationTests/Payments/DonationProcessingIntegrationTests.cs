@@ -12,12 +12,14 @@ using KindRaise.Domain.Donation;
 using KindRaise.DonationWorker.Consumers;
 using KindRaise.DonationWorker.OutboxMessages;
 using KindRaise.DonationWorker.PaymentProcessor;
+using KindRaise.Infrastructure.Caching;
 using KindRaise.Infrastructure.Database;
 using KindRaise.Infrastructure.Database.Repositories;
 using KindRaise.Infrastructure.Messaging.RabbitMQ;
 using KindRaise.Infrastructure.Payments;
 using KindRaise.IntegrationTests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
@@ -493,7 +495,18 @@ namespace KindRaise.IntegrationTests.Payments
         public async Task PaymentConfirmed_WhenSameMessageIsDeliveredTwice_CampaignIsUpdatedOnlyOnce()
         {
             // Arrange
-            await using var serviceProvider = IntegrationTestServiceProvider.Create(fixture);
+            await using var serviceProvider = IntegrationTestServiceProvider.Create(
+                fixture,
+                configureServices: services =>
+                {
+                    services.RemoveAll<ICampaignCache>();
+
+                    services.AddSingleton<RecordingCampaignCache>();
+
+                    services.AddScoped<ICampaignCache>(sp =>
+                        sp.GetRequiredService<RecordingCampaignCache>());
+                });
+
             Guid campaignId;
 
             await using (var scope = serviceProvider.CreateAsyncScope())
@@ -1094,6 +1107,195 @@ namespace KindRaise.IntegrationTests.Payments
                 .SingleAsync(c => c.Id == campaignId);
 
             Assert.Equal(1_100m, updatedCampaign.DonatedAmount);
+        }
+
+        [Fact]
+        public async Task ProcessAsync_WhenPaymentIsConfirmed_ShouldInvalidateCampaignCache()
+        {
+            // Arrange
+            await using var serviceProvider = IntegrationTestServiceProvider.Create(
+                fixture,
+                configureServices: services =>
+                {
+                    services.RemoveAll<ICampaignCache>();
+                    services.AddSingleton<RecordingCampaignCache>();
+                    services.AddScoped<ICampaignCache>(sp => sp.GetRequiredService<RecordingCampaignCache>());
+                });
+
+            Guid campaignId;
+
+            await using (var scope = serviceProvider.CreateAsyncScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<KindRaiseDbContext>();
+
+                await dbContext.Database.MigrateAsync();
+
+                var campaign = new Campaign(
+                    "Concurrency Test",
+                    "Testing lost updates.",
+                    10_000m,
+                    DateTimeOffset.UtcNow.AddDays(-1),
+                    DateTimeOffset.UtcNow.AddDays(30));
+
+                campaign.AddDonation(900m);
+
+                campaignId = campaign.Id;
+
+                dbContext.Campaigns.Add(campaign);
+                await dbContext.SaveChangesAsync();
+            }
+
+            var cache = serviceProvider.GetRequiredService<RecordingCampaignCache>();
+            var processor = serviceProvider.GetRequiredService<PaymentConfirmedProcessor>();
+
+            var message = new PaymentConfirmed(
+                Guid.NewGuid(),
+                campaignId,
+                100m);
+
+            var messageId = Guid.NewGuid().ToString();
+
+            // Act
+            await processor.ProcessAsync(
+                message,
+                messageId,
+                CancellationToken.None);
+
+            // Assert
+            Assert.Contains(campaignId, cache.RemovedCampaignIds);
+            Assert.Single(cache.RemovedCampaignIds);
+        }
+
+        [Fact]
+        public async Task ProcessAsync_WhenMessageIsDuplicate_ShouldNotInvalidateCampaignCacheAgain()
+        {
+            // Arrange
+            await using var serviceProvider = IntegrationTestServiceProvider.Create(
+                  fixture,
+                  configureServices: services =>
+                  {
+                      services.RemoveAll<ICampaignCache>();
+                      services.AddSingleton<RecordingCampaignCache>();
+                      services.AddScoped<ICampaignCache>(sp => sp.GetRequiredService<RecordingCampaignCache>());
+                  });
+
+            Guid campaignId;
+
+            await using (var scope = serviceProvider.CreateAsyncScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<KindRaiseDbContext>();
+
+                await dbContext.Database.MigrateAsync();
+
+                var campaign = new Campaign(
+                    "Concurrency Test",
+                    "Testing lost updates.",
+                    10_000m,
+                    DateTimeOffset.UtcNow.AddDays(-1),
+                    DateTimeOffset.UtcNow.AddDays(30));
+
+                campaign.AddDonation(900m);
+
+                campaignId = campaign.Id;
+
+                dbContext.Campaigns.Add(campaign);
+                await dbContext.SaveChangesAsync();
+            }
+
+            var cache = serviceProvider.GetRequiredService<RecordingCampaignCache>();
+            var processor = serviceProvider.GetRequiredService<PaymentConfirmedProcessor>();
+
+            var message = new PaymentConfirmed(
+                Guid.NewGuid(),
+                campaignId,
+                100m);
+
+            var messageId = Guid.NewGuid().ToString();
+
+            // Act: first execution
+            await processor.ProcessAsync(
+                message,
+                messageId,
+                CancellationToken.None);
+
+            Assert.Single(cache.RemovedCampaignIds);
+            cache.Clear();
+
+            // Act: second execution
+            await processor.ProcessAsync(
+                message,
+                messageId,
+                CancellationToken.None);
+
+            // Assert
+            Assert.Empty(cache.RemovedCampaignIds);
+        }
+
+        [Fact]
+        public async Task ProcessAsync_WhenRedisIsUnavailable_ShouldStillConfirmPayment()
+        {
+            // Arrange
+            await using var serviceProvider = IntegrationTestServiceProvider.Create(
+                  fixture,
+                  configureServices: services =>
+                  {
+                      services.RemoveAll<ICampaignCache>();
+                      services.RemoveAll<IDistributedCache>();
+                      services.AddSingleton<IDistributedCache, FailingDistributedCache>();
+                      services.AddScoped<ICampaignCache, RedisCampaignCache>();
+                  });
+
+            Guid campaignId;
+
+            await using (var scope = serviceProvider.CreateAsyncScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<KindRaiseDbContext>();
+
+                await dbContext.Database.MigrateAsync();
+
+                var campaign = new Campaign(
+                    "Concurrency Test",
+                    "Testing payment processing when Redis is unavailable.",
+                    10_000m,
+                    DateTimeOffset.UtcNow.AddDays(-1),
+                    DateTimeOffset.UtcNow.AddDays(30));
+
+                campaign.AddDonation(900m);
+
+                campaignId = campaign.Id;
+
+                dbContext.Campaigns.Add(campaign);
+                await dbContext.SaveChangesAsync();
+            }
+
+            var processor = serviceProvider.GetRequiredService<PaymentConfirmedProcessor>();
+
+            var message = new PaymentConfirmed(
+                Guid.NewGuid(),
+                campaignId,
+                100m);
+
+            var messageId = Guid.NewGuid().ToString();
+
+            // Act
+            var exception = await Record.ExceptionAsync(() =>
+                processor.ProcessAsync(
+                    message,
+                    messageId,
+                    CancellationToken.None));
+
+            // Assert
+            Assert.Null(exception);
+
+            await using var verificationScope = serviceProvider.CreateAsyncScope();
+            var verificationDbContext = verificationScope.ServiceProvider.GetRequiredService<KindRaiseDbContext>();
+
+            var updatedCampaign = await verificationDbContext.Campaigns
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.Id == campaignId);
+
+            Assert.NotNull(updatedCampaign);
+            Assert.Equal(1_000m, updatedCampaign.DonatedAmount);
         }
     }
 }

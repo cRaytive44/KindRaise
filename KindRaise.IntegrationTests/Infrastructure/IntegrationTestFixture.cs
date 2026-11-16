@@ -13,16 +13,17 @@ namespace KindRaise.IntegrationTests.Infrastructure
             .Build();
 
         private readonly RabbitMqContainer _rabbitMq =
-        new RabbitMqBuilder("rabbitmq:4-management")
-            .WithUsername("guest")
-            .WithPassword("guest")
-            .Build();
+            new RabbitMqBuilder("rabbitmq:4-management")
+                .WithUsername("guest")
+                .WithPassword("guest")
+                .Build();
 
         public string PostgreSqlConnectionString => _postgres.GetConnectionString();
         public string RabbitMqHost => _rabbitMq.Hostname;
         public int RabbitMqPort => _rabbitMq.GetMappedPublicPort(5672);
         public string RabbitMqUsername => "guest";
         public string RabbitMqPassword => "guest";
+        public string RedisConnectionString => "Redis";
 
         public async Task InitializeAsync()
         {
