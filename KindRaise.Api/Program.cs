@@ -12,6 +12,7 @@ using KindRaise.Application.Services.Campaigns.GetCampaigns;
 using KindRaise.Application.Services.Donations.CreateDonation;
 using KindRaise.Application.Services.Donations.GetDonation;
 using KindRaise.Application.Services.Donations.GetDonations;
+using KindRaise.Infrastructure.Caching;
 using KindRaise.Infrastructure.Database;
 using KindRaise.Infrastructure.Database.Repositories;
 using KindRaise.Infrastructure.Messaging.RabbitMQ;
@@ -29,7 +30,7 @@ builder.Services.AddDbContext<KindRaiseDbContext>(options =>
     options.UseNpgsql(
         builder.Configuration.GetConnectionString("KindRaiseDb")));
 
-                               // Services
+// Services
 builder.Services.AddScoped<ICampaignRepository, EfCampaignRepository>();
 builder.Services.AddScoped<IDonationRepository, EfDonationRepository>();
 builder.Services.AddScoped<IMessagePublisher, RabbitMQMessagePublisher>();
@@ -50,6 +51,13 @@ builder.Services.AddScoped<IGetDonationsService, GetDonationsService>();
 
 builder.Services.AddScoped<IProcessedMessageRepository, EfProcessedMessageRepository>();
 builder.Services.AddScoped<IOutboxRepository, EfOutboxRepository>();
+
+builder.Services.AddStackExchangeRedisCache(options => 
+{
+    options.Configuration = builder.Configuration.GetConnectionString("Redis");
+    options.InstanceName = "KindRaise";
+});
+builder.Services.AddScoped<ICampaignCache, RedisCampaignCache>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();

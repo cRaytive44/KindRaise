@@ -8,6 +8,7 @@ using KindRaise.Application.Services;
 using KindRaise.Application.Services.Donations.CreateDonation;
 using KindRaise.DonationWorker.OutboxMessages;
 using KindRaise.DonationWorker.PaymentProcessor;
+using KindRaise.Infrastructure.Caching;
 using KindRaise.Infrastructure.Database;
 using KindRaise.Infrastructure.Database.Repositories;
 using KindRaise.Infrastructure.Messaging.RabbitMQ;
@@ -74,6 +75,13 @@ namespace KindRaise.IntegrationTests.Infrastructure
 
             services.AddScoped<OutboxMessageProcessor>();
             services.AddSingleton<PaymentConfirmedProcessor>();
+
+            services.AddStackExchangeRedisCache(options =>
+            {
+                options.Configuration = fixture.RedisConnectionString;
+                options.InstanceName = "KindRaise";
+            });
+            services.AddScoped<ICampaignCache, RedisCampaignCache>();
 
             configureServices?.Invoke(services);
 

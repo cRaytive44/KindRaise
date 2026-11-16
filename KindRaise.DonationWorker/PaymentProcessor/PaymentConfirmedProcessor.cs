@@ -24,6 +24,7 @@ namespace KindRaise.DonationWorker.PaymentProcessor
                 var processedMessages = scope.ServiceProvider.GetRequiredService<IProcessedMessageRepository>();
                 var campaigns = scope.ServiceProvider.GetRequiredService<ICampaignRepository>();
                 var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+                var campaignCache = scope.ServiceProvider.GetRequiredService<ICampaignCache>();
 
                 await unitOfWork.BeginTransactionAsync(cancellationToken);
 
@@ -57,6 +58,18 @@ namespace KindRaise.DonationWorker.PaymentProcessor
 
                     await unitOfWork.SaveChangesAsync(cancellationToken);
                     await unitOfWork.CommitTransactionAsync(cancellationToken);
+
+                    try
+                    {
+                        await campaignCache.RemoveAsync(message.CampaignId, CancellationToken.None);
+                    }
+                    catch (Exception exception)
+                    {
+                        logger.LogError(
+                            exception,
+                            "Failed to invalidate cache for campaign {CampaignId} after payment confirmation.",
+                            message.CampaignId);
+                    }
 
                     logger.LogInformation(
                         "Payment confirmed. MessageId: {MessageId}, CampaignId: {CampaignId}, Amount: {Amount}",
